@@ -2,6 +2,7 @@ import express from "express";
 import fetch from "node-fetch";
 
 const app = express();
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 const {
@@ -47,7 +48,6 @@ function addToHistory(userId, role, content) {
 async function askClaude(userId, userMessage) {
   addToHistory(userId, "user", userMessage);
   const history = getHistory(userId);
-
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -62,41 +62,26 @@ async function askClaude(userId, userMessage) {
       messages: history,
     }),
   });
-
   const data = await response.json();
-  const reply = data.content?.[0]?.text ?? "Lo sentimos, hubo un error. Por favor intenta de nuevo.";
+  const reply = data.content?.[0]?.text ?? "Lo sentimos, hubo un error.";
   addToHistory(userId, "assistant", reply);
   return reply;
 }
 
-async function sendWhatsAppMessage(to, body) {
-  const credentials = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
-  await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      From: `whatsapp:${TWILIO_WHATSAPP_NUMBER}`,
-      To: to,
-      Body: body,
-    }),
-  });
-}
-
 app.post("/webhook", async (req, res) => {
-  res.sendStatus(200);
   try {
     const from = req.body.From;
     const text = req.body.Body;
-    if (!from || !text) return;
+    if (!from || !text) return res.sendStatus(200);
     console.log(`[${from}] → ${text}`);
     const reply = await askClaude(from, text);
     console.log(`[${from}] ← ${reply}`);
-    await sendWhatsAppMessage(from, reply);
+    res.set("Content-Type", "text/xml");
+    res.send(`<Response><Message>${reply}</Message></Response>`);
   } catch (err) {
     console.error("Error:", err);
+    res.set("Content-Type", "text/xml");
+    res.send(`<Response><Message>Lo sentimos, hubo un error. Intenta de nuevo.</Message></Response>`);
   }
 });
 
