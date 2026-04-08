@@ -79,7 +79,9 @@ app.post("/webhook", async (req, res) => {
     res.set("Content-Type", "text/xml");
     res.send(`<Response><Message>${reply}</Message></Response>`);
   } catch (err) {
-    console.error("Error:", err);
+    console.error("Error completo:", JSON.stringify( err, null, 2));
+    console.error("Error mensaje:" err.message);
+    console.error("Error stack:", err.stack);
     res.set("Content-Type", "text/xml");
     res.send(`<Response><Message>Lo sentimos, hubo un error. Intenta de nuevo.</Message></Response>`);
   }
